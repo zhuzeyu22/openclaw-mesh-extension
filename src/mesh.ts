@@ -27,6 +27,15 @@ interface Agent {
   taskCount: number;
   successCount: number;
   lastActiveAt: Date;
+  totalTaskDuration: number;  // 总任务执行时间（用于计算平均响应时间）
+  collaborationCount: number; // 协作次数
+}
+
+interface AgentMetrics {
+  totalTasks: number;
+  successfulTasks: number;
+  totalDuration: number;
+  collaborationCount: number;
 }
 
 /**
@@ -50,6 +59,19 @@ export class SelfEvolvingMesh {
   private techScanTimer?: NodeJS.Timeout;
   private currentPlan: EvolutionPlan | null = null;
   private executor?: TaskExecutor;
+
+  // 性能指标追踪
+  private agentMetrics: Map<string, AgentMetrics> = new Map();
+  private taskDurations: Map<string, number> = new Map(); // taskId -> durationMs
+  private readonly MAX_TASK_DURATIONS = 100; // 限制历史记录数量
+
+  // 内存清理定时器
+  private cleanupTimer?: NodeJS.Timeout;
+  private readonly CLEANUP_INTERVAL = 5 * 60 * 1000; // 5分钟清理一次
+  private readonly MAX_RESULT_AGE = 30 * 60 * 1000; // 结果保留30分钟
+
+  // 任务队列锁
+  private isProcessingQueue = false;
 
   constructor(config: MeshConfig) {
     this.config = config;
@@ -88,6 +110,9 @@ export class SelfEvolvingMesh {
       this.startProactiveEvolutionLoop(); // 启动主动进化
     }
 
+    // 启动内存清理定时器
+    this.startCleanupLoop();
+
     console.log(`[SEAM] Mesh started with ${this.agents.size} agents`);
     console.log(`[SEAM] Smart evolution planner: enabled`);
     console.log(`[SEAM] Tech awareness: enabled`);
@@ -111,9 +136,14 @@ export class SelfEvolvingMesh {
     if (this.techScanTimer) {
       clearInterval(this.techScanTimer);
     }
+    if (this.cleanupTimer) {
+      clearInterval(this.cleanupTimer);
+    }
     this.techAwareness.stop();
     this.proactiveExplorer.stop();
     this.agents.clear();
+    this.agentMetrics.clear();
+    this.taskDurations.clear();
     console.log('[SEAM] Mesh stopped');
   }
 
@@ -139,8 +169,12 @@ export class SelfEvolvingMesh {
 
     this.taskQueue.push(task);
 
-    // 尝试立即执行
-    this.processQueue();
+    // 使用 setImmediate 确保任务完全入队后再处理，避免竞争条件
+    setImmediate(() => {
+      if (!this.isProcessingQueue) {
+        void this.processQueue();
+      }
+    });
 
     return task;
   }
@@ -430,46 +464,67 @@ export class SelfEvolvingMesh {
     };
 
     const agent: Agent = {
-      id: `seam-${type}-${dnaId.slice(0, 8)}`,  // 添加 seam- 命名空间前缀
+      id: `seam-${type}-${dnaId.slice(0, 8)}`,
       type,
       dna,
       isBusy: false,
       taskCount: 0,
       successCount: 0,
       lastActiveAt: new Date(),
+      totalTaskDuration: 0,
+      collaborationCount: 0,
     };
+
+    // 初始化智能体指标
+    this.agentMetrics.set(agent.id, {
+      totalTasks: 0,
+      successfulTasks: 0,
+      totalDuration: 0,
+      collaborationCount: 0,
+    });
 
     this.agents.set(agent.id, agent);
     return agent;
   }
 
   private async processQueue(): Promise<void> {
-    if (!this.isRunning || this.taskQueue.length === 0) return;
+    if (!this.isRunning || this.taskQueue.length === 0 || this.isProcessingQueue) return;
 
-    const task = this.taskQueue[0];
+    // 获取锁
+    this.isProcessingQueue = true;
 
-    // 根据任务类型选择智能体
-    const agentType = this.selectAgentType(task);
-    const availableAgents = Array.from(this.agents.values()).filter(
-      (a) => a.type === agentType && !a.isBusy
-    );
+    try {
+      const task = this.taskQueue[0];
 
-    if (availableAgents.length === 0) {
-      // 没有可用智能体，等待
-      return;
+      // 根据任务类型选择智能体
+      const agentType = this.selectAgentType(task);
+      const availableAgents = Array.from(this.agents.values()).filter(
+        (a) => a.type === agentType && !a.isBusy
+      );
+
+      if (availableAgents.length === 0) {
+        // 没有可用智能体，释放锁并返回
+        return;
+      }
+
+      // 选择最空闲的智能体
+      const agent = availableAgents.sort(
+        (a, b) => a.taskCount - b.taskCount
+      )[0];
+
+      // 出队并执行
+      this.taskQueue.shift();
+      await this.executeTask(task, agent);
+
+      // 继续处理队列（使用 setImmediate 避免阻塞）
+      setImmediate(() => {
+        this.isProcessingQueue = false;
+        void this.processQueue();
+      });
+    } catch (error) {
+      console.error('[SEAM] Error processing queue:', error);
+      this.isProcessingQueue = false;
     }
-
-    // 选择最空闲的智能体
-    const agent = availableAgents.sort(
-      (a, b) => a.taskCount - b.taskCount
-    )[0];
-
-    // 出队并执行
-    this.taskQueue.shift();
-    await this.executeTask(task, agent);
-
-    // 继续处理队列
-    setImmediate(() => this.processQueue());
   }
 
   /**
@@ -485,36 +540,94 @@ export class SelfEvolvingMesh {
     agent.taskCount++;
 
     const startTime = Date.now();
+    const durationMs: number = 0;
 
     try {
       // 真实任务执行
       const output = await this.executeWithAgent(task, agent);
+
+      const actualDurationMs = Date.now() - startTime;
 
       const result: TaskResult = {
         taskId: task.id,
         success: true,
         output,
         executedBy: agent.id,
-        durationMs: Date.now() - startTime,
+        durationMs: actualDurationMs,
       };
 
       agent.successCount++;
+      agent.totalTaskDuration += actualDurationMs;
+
+      // 记录任务持续时间
+      this.recordTaskDuration(task.id, actualDurationMs);
+
+      // 更新智能体指标
+      this.updateAgentMetrics(agent.id, actualDurationMs, true);
+
       this.results.set(task.id, result);
       this.notifyResultWaiters(task.id, result);
     } catch (error) {
+      const actualDurationMs = Date.now() - startTime;
+
       const result: TaskResult = {
         taskId: task.id,
         success: false,
         output: `Error: ${error}`,
         executedBy: agent.id,
-        durationMs: Date.now() - startTime,
+        durationMs: actualDurationMs,
       };
+
+      // 记录任务持续时间
+      this.recordTaskDuration(task.id, actualDurationMs);
+
+      // 更新智能体指标
+      this.updateAgentMetrics(agent.id, actualDurationMs, false);
+
       this.results.set(task.id, result);
       this.notifyResultWaiters(task.id, result);
     } finally {
       agent.isBusy = false;
       agent.lastActiveAt = new Date();
     }
+  }
+
+  /**
+   * 记录任务持续时间
+   */
+  private recordTaskDuration(taskId: string, duration: number): void {
+    this.taskDurations.set(taskId, duration);
+
+    // 限制历史记录数量，防止内存泄漏
+    if (this.taskDurations.size > this.MAX_TASK_DURATIONS) {
+      const firstKey = this.taskDurations.keys().next().value;
+      if (firstKey !== undefined) {
+        this.taskDurations.delete(firstKey);
+      }
+    }
+  }
+
+  /**
+   * 更新智能体指标
+   */
+  private updateAgentMetrics(agentId: string, duration: number, success: boolean): void {
+    const metrics = this.agentMetrics.get(agentId);
+    if (metrics) {
+      metrics.totalTasks++;
+      metrics.totalDuration += duration;
+      if (success) {
+        metrics.successfulTasks++;
+      }
+    }
+  }
+
+  /**
+   * 计算平均响应时间（基于实际任务执行时间）
+   */
+  private calculateAvgResponseTime(): number {
+    if (this.taskDurations.size === 0) return 0;
+    const durations = Array.from(this.taskDurations.values());
+    return durations.reduce((a, b) => a + b, 0) / durations.length;
   }
 
   /**
@@ -559,6 +672,53 @@ export class SelfEvolvingMesh {
     }
 
     return 'executor';
+  }
+
+  /**
+   * 启动内存清理循环
+   */
+  private startCleanupLoop(): void {
+    this.cleanupTimer = setInterval(() => {
+      this.cleanupStalledResults();
+    }, this.CLEANUP_INTERVAL);
+
+    console.log(`[SEAM] Cleanup loop started: ${this.CLEANUP_INTERVAL / 60000}min interval`);
+  }
+
+  /**
+   * 清理滞留的结果和等待者（防止内存泄漏）
+   */
+  private cleanupStalledResults(): void {
+    const now = Date.now();
+    let cleanedCount = 0;
+
+    // 清理过期的结果
+    for (const [taskId, result] of this.results) {
+      // 使用任务ID中的时间戳（如果格式支持）或使用当前时间
+      // 这里我们假设结果应该在一段时间后被消费
+      // 如果没有被消费，就清理掉
+      const resultAge = now - result.durationMs; // 这是一个近似值
+      if (resultAge > this.MAX_RESULT_AGE) {
+        this.results.delete(taskId);
+        cleanedCount++;
+      }
+    }
+
+    // 清理没有对应结果的等待者
+    for (const [taskId, waiters] of this.resultWaiters) {
+      if (!this.results.has(taskId)) {
+        // 通知所有等待者结果不可用
+        for (const { resolve } of waiters) {
+          resolve(null);
+        }
+        this.resultWaiters.delete(taskId);
+        cleanedCount++;
+      }
+    }
+
+    if (cleanedCount > 0) {
+      console.log(`[SEAM] Cleaned up ${cleanedCount} stalled results/waiters`);
+    }
   }
 
   private startEvolutionLoop(): void {
@@ -657,19 +817,17 @@ export class SelfEvolvingMesh {
     const busyAgents = allAgents.filter(a => a.isBusy).length;
     const utilization = allAgents.length > 0 ? busyAgents / allAgents.length : 0;
 
-    // 计算平均响应时间
-    const avgResponseTime = allAgents.length > 0
-      ? allAgents.reduce((sum, a) => sum + (a.lastActiveAt.getTime() - Date.now()), 0) / allAgents.length
-      : 0;
+    // 计算平均响应时间（基于实际任务执行时间）
+    const avgResponseTime = this.calculateAvgResponseTime();
 
     return {
       timestamp: Date.now(),
       agentCount: status.agentCount,
       agentsByType: status.agentsByType,
       taskQueueLength: status.queueLength,
-      avgTaskWaitTime: Math.abs(avgWaitTime),
+      avgTaskWaitTime: avgWaitTime,
       taskSuccessRate: successRate,
-      avgResponseTime: Math.abs(avgResponseTime),
+      avgResponseTime: avgResponseTime,
       resourceUtilization: utilization,
       errorRate: 1 - successRate,
     };
@@ -691,13 +849,32 @@ export class SelfEvolvingMesh {
   }
 
   private calculateFitness(agent: Agent): FitnessScore {
-    const successRate = agent.taskCount > 0 ? agent.successCount / agent.taskCount : 0.5;
+    const metrics = this.agentMetrics.get(agent.id);
+
+    if (!metrics || metrics.totalTasks === 0) {
+      return {
+        successRate: 0.5,
+        avgResponseTime: 0,
+        collaborationScore: 0.5,
+        overall: 0.5,
+      };
+    }
+
+    const successRate = metrics.successfulTasks / metrics.totalTasks;
+    const avgResponseTime = metrics.totalDuration / metrics.totalTasks;
+    const collaborationScore = Math.min(1, metrics.collaborationCount / 10);
+
+    // 综合评分：成功率 40% + 响应速度 30% + 协作评分 30%
+    // 响应速度评分：越快越好，假设 5秒以内为满分
+    const responseTimeScore = Math.max(0, 1 - avgResponseTime / 5000);
+
+    const overall = successRate * 0.4 + responseTimeScore * 0.3 + collaborationScore * 0.3;
 
     return {
       successRate,
-      avgResponseTime: 1000, // 简化
-      collaborationScore: 0.7,
-      overall: successRate * 0.8 + 0.2,
+      avgResponseTime,
+      collaborationScore,
+      overall,
     };
   }
 

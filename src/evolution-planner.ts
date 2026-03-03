@@ -206,8 +206,10 @@ export class EvolutionPlanner {
     // 调整阈值
     const recentRecords = this.history.slice(-10);
     const avgQueueLength = recentRecords.reduce((sum, r) => {
-      const bottleneck = r.plan.bottlenecks.find((b: {type: string}) => b.type === 'capacity');
-      return sum + (bottleneck ? bottleneck.metrics.queueLength || 0 : 0);
+      const bottleneck = r.plan.bottlenecks.find((b: {type: string; metrics?: Record<string, number>}) => b.type === 'capacity');
+      // 安全访问 metrics.queueLength，因为 metrics 只在特定瓶颈类型中存在
+      const queueLength = bottleneck?.metrics?.queueLength ?? 0;
+      return sum + queueLength;
     }, 0) / recentRecords.length;
 
     // 如果频繁出现容量瓶颈，降低触发阈值

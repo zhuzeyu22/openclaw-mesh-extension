@@ -18,8 +18,8 @@
 
 ```bash
 # 1. 克隆项目
-git clone https://github.com/your-org/openclaw-mesh.git
-cd openclaw-mesh
+git clone https://github.com/zhuzeyu22/openclaw-mesh-extension.git
+cd openclaw-mesh-extension
 
 # 2. 运行安装脚本
 chmod +x install.sh
@@ -36,21 +36,21 @@ openclaw agent --message "网格状态"
 
 ```bash
 # 1. 构建项目
-cd openclaw-mesh
+cd openclaw-mesh-extension
 npm install
 npm run build
 
 # 2. 复制到 OpenClaw
-mkdir -p ~/.openclaw/extensions/openclaw-mesh
-cp -r dist/* ~/.openclaw/extensions/openclaw-mesh/
-cp package.json ~/.openclaw/extensions/openclaw-mesh/
+mkdir -p ~/.openclaw/extensions/openclaw-mesh-extension
+cp -r dist/ ~/.openclaw/extensions/openclaw-mesh-extension/
+cp package.json ~/.openclaw/extensions/openclaw-mesh-extension/
 
 # 3. 添加配置
 cat >> ~/.openclaw/config.yaml << 'EOF'
 extensions:
-  - path: ./extensions/openclaw-mesh
+  - path: ./extensions/openclaw-mesh-extension
     enabled: true
-mesh:
+seam:
   autoStart: true
 EOF
 
@@ -80,11 +80,11 @@ tail -f /tmp/openclaw-gateway.log | grep -i mesh
 
 ```yaml
 extensions:
-  - path: ./extensions/openclaw-mesh
+  - path: ./extensions/openclaw-mesh-extension
     enabled: true
 
-# 可选：自定义网格配置
-mesh:
+# 可选：自定义网格配置（使用 'seam' 键，兼容旧版 'mesh'）
+seam:
   genesisAgents:
     - type: orchestrator
       count: 1
@@ -341,8 +341,8 @@ cd /opt/openclaw  # 或你的安装路径
 # 4. 安装扩展
 mkdir -p extensions
 cd extensions
-git clone https://github.com/your-org/openclaw-mesh.git
-cd openclaw-mesh
+git clone https://github.com/zhuzeyu22/openclaw-mesh-extension.git
+cd openclaw-mesh-extension
 npm install
 npm run build
 
@@ -350,7 +350,7 @@ npm run build
 cd ~/.openclaw
 cat >> config.yaml << 'EOF'
 extensions:
-  - path: ./extensions/openclaw-mesh
+  - path: ./extensions/openclaw-mesh-extension
     enabled: true
 EOF
 
@@ -396,7 +396,7 @@ grep -i "mesh\|seam" ~/.openclaw/logs/gateway.log
 ### 编译错误
 
 ```bash
-cd ~/.openclaw/extensions/openclaw-mesh
+cd ~/.openclaw/extensions/openclaw-mesh-extension
 rm -rf dist node_modules
 npm install
 npm run build

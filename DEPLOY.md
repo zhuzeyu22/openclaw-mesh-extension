@@ -46,15 +46,15 @@ ls dist/
 # 通常是 ~/.openclaw/extensions/ 或 /opt/openclaw/extensions/
 
 # 创建扩展目录
-mkdir -p ~/.openclaw/extensions/openclaw-mesh
+mkdir -p ~/.openclaw/extensions/openclaw-mesh-extension
 
 # 复制构建后的文件
-cp -r dist/ ~/.openclaw/extensions/openclaw-mesh/
-cp package.json ~/.openclaw/extensions/openclaw-mesh/
-cp README.md ~/.openclaw/extensions/openclaw-mesh/
+cp -r dist/ ~/.openclaw/extensions/openclaw-mesh-extension/
+cp package.json ~/.openclaw/extensions/openclaw-mesh-extension/
+cp README.md ~/.openclaw/extensions/openclaw-mesh-extension/
 
 # 验证复制成功
-ls -la ~/.openclaw/extensions/openclaw-mesh/
+ls -la ~/.openclaw/extensions/openclaw-mesh-extension/
 ```
 
 #### 步骤 3：配置 OpenClaw
@@ -75,7 +75,7 @@ nano ~/.openclaw/config.yaml
 ```yaml
 # 在文件末尾添加
 extensions:
-  - path: ./extensions/openclaw-mesh
+  - path: ./extensions/openclaw-mesh-extension
     enabled: true
 
 # SEAM 网格配置（推荐使用 'seam' 键，兼容旧版 'mesh'）
@@ -205,7 +205,7 @@ npm run build
 # 5. 安装扩展
 echo ""
 echo "📋 Step 5: 安装扩展到 OpenClaw"
-EXTENSION_DIR="$OPENCLAW_PATH/extensions/openclaw-mesh"
+EXTENSION_DIR="$OPENCLAW_PATH/extensions/openclaw-mesh-extension"
 mkdir -p "$EXTENSION_DIR"
 rm -rf "$EXTENSION_DIR"/*
 cp -r dist/* "$EXTENSION_DIR/"
@@ -227,7 +227,7 @@ if [ -f "$CONFIG_FILE" ]; then
 
 # Self-Evolving Agent Mesh (SEAM) Extension
 extensions:
-  - path: ./extensions/openclaw-mesh
+  - path: ./extensions/openclaw-mesh-extension
     enabled: true
 
 seam:
@@ -308,8 +308,8 @@ npm run build
 
 # 2. 复制新文件
 OPENCLAW_PATH=${OPENCLAW_PATH:-$HOME/.openclaw}
-rm -rf "$OPENCLAW_PATH/extensions/openclaw-mesh/dist"
-cp -r dist/ "$OPENCLAW_PATH/extensions/openclaw-mesh/"
+rm -rf "$OPENCLAW_PATH/extensions/openclaw-mesh-extension/dist"
+cp -r dist/ "$OPENCLAW_PATH/extensions/openclaw-mesh-extension/"
 
 # 3. 重启 Gateway
 openclaw gateway restart
@@ -357,7 +357,7 @@ npm run build
 
 ```bash
 # 确保 OpenClaw 有权限读取扩展
-chmod -R 755 ~/.openclaw/extensions/openclaw-mesh
+chmod -R 755 ~/.openclaw/extensions/openclaw-mesh-extension
 ```
 
 ---
@@ -370,7 +370,7 @@ nano ~/.openclaw/config.yaml
 # 删除 extensions 和 mesh 相关配置
 
 # 2. 删除扩展文件
-rm -rf ~/.openclaw/extensions/openclaw-mesh
+rm -rf ~/.openclaw/extensions/openclaw-mesh-extension
 
 # 3. 重启 Gateway
 openclaw gateway restart
@@ -384,7 +384,7 @@ openclaw gateway restart
 ~/.openclaw/
 ├── config.yaml                    # OpenClaw 配置
 ├── extensions/
-│   └── openclaw-mesh/
+│   └── openclaw-mesh-extension/
 │       ├── package.json
 │       └── dist/
 │           ├── index.js           # 入口文件

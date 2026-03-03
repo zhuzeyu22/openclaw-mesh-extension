@@ -72,6 +72,8 @@ nano ~/.openclaw/config.yaml
 
 添加扩展配置：
 
+**⚠️ 重要：配置键必须是 `seam` 或 `mesh`，且与 extensions 同级**
+
 ```yaml
 # 在文件末尾添加
 extensions:
@@ -115,6 +117,11 @@ seam:
     enabled: true
     explorationIntervalMinutes: 20
 ```
+
+**配置注意事项：**
+1. `seam:` 必须与 `extensions:` 同级（顶格写，不要缩进）
+2. `seam:` 下的所有配置项需要缩进 2 个空格
+3. 如果 `seam` 键不工作，可以尝试使用 `mesh:` 键（向下兼容）
 
 #### 步骤 4：重启 OpenClaw Gateway
 

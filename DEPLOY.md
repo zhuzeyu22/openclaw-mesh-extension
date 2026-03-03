@@ -374,16 +374,57 @@ openclaw agent --message "网格状态"
 
 ## 故障排除
 
-### 问题 1：扩展未加载
+### 问题 1：配置键不被识别
+
+**错误信息：**
+```
+Invalid config at /root/.openclaw/openclaw.json:
+- <root>: Unrecognized keys: "extensions", "seam"
+```
+
+**原因：** 你的 OpenClaw 版本（如 2026.2.26）不支持插件扩展系统。
+
+**版本兼容性：**
+- ✅ OpenClaw 2026.3.x 及以上：支持插件扩展
+- ❌ OpenClaw 2026.2.x 及以下：不支持插件扩展
+
+**解决方案：**
+
+1. **升级 OpenClaw**（推荐）：
+   ```bash
+   npm install -g openclaw@latest
+   openclaw --version  # 确认版本 >= 2026.3.0
+   ```
+
+2. **或者使用独立运行模式**（无需 OpenClaw 插件支持）：
+   ```bash
+   # 使用 standalone.js 运行网格
+   cd ~/.openclaw/extensions/openclaw-mesh-extension
+   node standalone.js
+   ```
+
+   或者使用 PM2 后台运行：
+   ```bash
+   npm install -g pm2
+   pm2 start standalone.js --name seam-mesh
+   pm2 save
+   pm2 startup
+   ```
+
+### 问题 2：扩展未加载
 
 ```bash
+# 检查 OpenClaw 版本是否支持扩展
+openclaw --version
+
 # 检查 OpenClaw 日志
 tail -n 50 ~/.openclaw/logs/gateway.log | grep -i mesh
 
 # 常见原因：
-# 1. 路径错误 - 确保路径相对于 config.yaml
-# 2. 缺少 dist 目录 - 重新运行 npm run build
-# 3. 语法错误 - 检查 config.yaml 格式
+# 1. OpenClaw 版本太旧，不支持插件系统
+# 2. 路径错误 - 确保路径相对于 config.yaml
+# 3. 缺少 dist 目录 - 重新运行 npm run build
+# 4. 语法错误 - 检查配置文件格式
 ```
 
 ### 问题 2：网格无法启动

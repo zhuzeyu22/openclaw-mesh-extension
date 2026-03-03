@@ -16,6 +16,7 @@ import type {
 import { EvolutionPlanner, type HistoricalEvolution } from './evolution-planner.js';
 import { TechAwareness } from './tech-awareness.js';
 import { ProactiveExplorer, type ExplorationOpportunity } from './proactive-explorer.js';
+import { generateId, sleep, createResolvablePromise } from './utils.js';
 
 interface Agent {
   id: string;
@@ -35,6 +36,7 @@ export class SelfEvolvingMesh {
   private agents: Map<string, Agent> = new Map();
   private taskQueue: Task[] = [];
   private results: Map<string, TaskResult> = new Map();
+  private resultWaiters: Map<string, Array<{ resolve: (value: TaskResult | null) => void; reject: (reason?: unknown) => void }>> = new Map();
   private isRunning = false;
   private generation = 1;
   private lastEvolutionAt?: Date;
@@ -125,7 +127,7 @@ export class SelfEvolvingMesh {
     } = {}
   ): Promise<Task> {
     const task: Task = {
-      id: this.generateId(),
+      id: generateId(),
       description,
       complexity: options.complexity || 'medium',
       submitter: options.submitter || 'unknown',
@@ -142,21 +144,44 @@ export class SelfEvolvingMesh {
   }
 
   /**
-   * 获取任务结果
+   * 获取任务结果（使用事件驱动，非忙等待）
    */
   async getResult(taskId: string, timeoutMs = 30000): Promise<TaskResult | null> {
-    const startTime = Date.now();
-
-    while (Date.now() - startTime < timeoutMs) {
-      const result = this.results.get(taskId);
-      if (result) {
-        this.results.delete(taskId);
-        return result;
-      }
-      await this.sleep(100);
+    // 先检查是否已有结果
+    const existingResult = this.results.get(taskId);
+    if (existingResult) {
+      this.results.delete(taskId);
+      return existingResult;
     }
 
-    return null;
+    // 创建等待器
+    const { promise, resolve } = createResolvablePromise<TaskResult | null>();
+
+    if (!this.resultWaiters.has(taskId)) {
+      this.resultWaiters.set(taskId, []);
+    }
+    this.resultWaiters.get(taskId)!.push({ resolve, reject: () => resolve(null) });
+
+    // 设置超时
+    const timeoutId = setTimeout(() => resolve(null), timeoutMs);
+
+    const result = await promise;
+    clearTimeout(timeoutId);
+
+    return result;
+  }
+
+  /**
+   * 通知等待者结果可用
+   */
+  private notifyResultWaiters(taskId: string, result: TaskResult): void {
+    const waiters = this.resultWaiters.get(taskId);
+    if (waiters) {
+      for (const { resolve } of waiters) {
+        resolve(result);
+      }
+      this.resultWaiters.delete(taskId);
+    }
   }
 
   /**
@@ -392,8 +417,9 @@ export class SelfEvolvingMesh {
   // ============ 私有方法 ============
 
   private async spawnAgent(type: AgentType, parentIds: string[] = []): Promise<Agent> {
+    const dnaId = generateId();
     const dna: AgentDNA = {
-      id: this.generateId(),
+      id: dnaId,
       generation: parentIds.length > 0 ? this.generation + 1 : 1,
       parentIds,
       createdAt: new Date(),
@@ -402,7 +428,7 @@ export class SelfEvolvingMesh {
     };
 
     const agent: Agent = {
-      id: `seam-${type}-${dna.id.slice(0, 8)}`,  // 添加 seam- 命名空间前缀
+      id: `seam-${type}-${dnaId.slice(0, 8)}`,  // 添加 seam- 命名空间前缀
       type,
       dna,
       isBusy: false,
@@ -464,6 +490,7 @@ export class SelfEvolvingMesh {
 
       agent.successCount++;
       this.results.set(task.id, result);
+      this.notifyResultWaiters(task.id, result);
     } catch (error) {
       const result: TaskResult = {
         taskId: task.id,
@@ -473,6 +500,7 @@ export class SelfEvolvingMesh {
         durationMs: Date.now() - startTime,
       };
       this.results.set(task.id, result);
+      this.notifyResultWaiters(task.id, result);
     } finally {
       agent.isBusy = false;
       agent.lastActiveAt = new Date();
@@ -482,7 +510,7 @@ export class SelfEvolvingMesh {
   private async simulateExecution(task: Task, agent: Agent): Promise<string> {
     // 模拟执行延迟
     const delay = task.complexity === 'simple' ? 500 : task.complexity === 'medium' ? 1500 : 3000;
-    await this.sleep(delay);
+    await sleep(delay);
 
     // 生成模拟结果
     const behaviors: Record<AgentType, string> = {
@@ -693,11 +721,4 @@ export class SelfEvolvingMesh {
     };
   }
 
-  private generateId(): string {
-    return `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
-  }
-
-  private sleep(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-  }
 }

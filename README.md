@@ -413,7 +413,39 @@ npm test
 
 # 构建
 npm run build
+
+# 类型检查
+npm run typecheck
 ```
+
+## 项目结构
+
+```
+src/
+├── index.ts              # 入口文件，导出所有公共 API
+├── plugin.ts             # OpenClaw 插件实现
+├── mesh.ts               # 核心网格控制器
+├── evolution-planner.ts  # 智能进化规划器
+├── tech-awareness.ts     # 科技趋势感知模块
+├── proactive-explorer.ts # 主动探索模块
+├── types.ts              # 类型定义
+└── utils.ts              # 共享工具函数（新增）
+```
+
+## 最近优化（2026-03-03）
+
+### 性能优化
+- **事件驱动架构**：将 `getResult()` 从忙等待轮询改为事件驱动，显著降低 CPU 占用
+- **内存管理**：添加数据清理机制，防止 `opportunities` 和 `experiments` 数组无限增长
+
+### 代码质量
+- **工具函数提取**：创建 `utils.ts` 模块，统一 `generateId`、`sleep` 等常用函数
+- **类型安全**：修复多处 `any` 类型，改进类型推断
+- **代码复用**：消除重复代码，统一使用共享工具函数
+
+### 架构改进
+- **可解析 Promise**：新增 `createResolvablePromise` 工具，用于异步流程控制
+- **数组大小限制**：新增 `limitArraySize` 工具，防止内存泄漏
 
 ## 许可证
 

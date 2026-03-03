@@ -145,6 +145,42 @@ overall = (
 
 ## 模块详解
 
+### Utils (共享工具模块)
+
+**文件**: `src/utils.ts`
+
+**作用**: 提供项目共享的工具函数，避免代码重复
+
+**功能列表**:
+```typescript
+// 生成唯一ID
+function generateId(prefix?: string): string
+
+// 异步延迟
+function sleep(ms: number): Promise<void>
+
+// 创建可解析的Promise（用于事件驱动架构）
+function createResolvablePromise<T>(): {
+  promise: Promise<T>
+  resolve: (value: T) => void
+  reject: (reason?: unknown) => void
+}
+
+// 计数数组元素出现次数
+function countOccurrences<T>(arr: T[]): Map<T, number>
+
+// 限制数组大小，防止内存泄漏
+function limitArraySize<T>(arr: T[], maxSize: number): T[]
+```
+
+**使用场景**:
+- 任务结果的事件驱动等待
+- ID 生成统一化
+- 数据统计和监控
+- 内存管理
+
+---
+
 ### MeshEventBus (网格事件总线)
 
 **作用**：智能体之间的通信基础设施
@@ -325,6 +361,19 @@ function analyzeCapabilityGap(agents: AgentDNA[], trends: TechTrend[]): Capabili
 
 **运行周期**：每 20 分钟探索一次
 
+**内存管理**:
+```typescript
+private readonly maxOpportunities = 50;   // 最大机会数
+private readonly maxExperiments = 100;    // 最大实验数
+
+private cleanupOldData(): void {
+  this.opportunities = limitArraySize(this.opportunities, this.maxOpportunities);
+  this.experiments = limitArraySize(this.experiments, this.maxExperiments);
+}
+```
+
+每次探索周期后自动清理旧数据，防止内存泄漏。
+
 **探索来源**：
 
 1. **技术趋势驱动**
@@ -414,7 +463,52 @@ Validator.validate() 验证结果
     ↓
 更新执行者适应度
     ↓
+通知等待者（事件驱动）
+    ↓
 返回结果给用户
+```
+
+**性能优化说明**:
+任务结果获取机制从"轮询检查"改为"事件通知":
+- **旧方式**: `getResult()` 每 100ms 轮询一次 `results` Map
+- **新方式**: 使用 `resultWaiters` Map 存储等待回调，结果就绪时主动 `notifyResultWaiters()`
+- **收益**:
+  - 降低 CPU 占用（消除忙等待）
+  - 提高响应速度（即时通知替代定时轮询）
+  - 更好的可扩展性
+
+实现代码:
+```typescript
+// 等待结果（非阻塞）
+async getResult(taskId: string, timeoutMs = 30000): Promise<TaskResult | null> {
+  // 检查结果是否已存在
+  const existing = this.results.get(taskId);
+  if (existing) return existing;
+
+  // 创建可解析的 Promise
+  const { promise, resolve } = createResolvablePromise<TaskResult | null>();
+
+  // 注册等待器
+  if (!this.resultWaiters.has(taskId)) {
+    this.resultWaiters.set(taskId, []);
+  }
+  this.resultWaiters.get(taskId)!.push({ resolve, reject: () => resolve(null) });
+
+  // 设置超时
+  setTimeout(() => resolve(null), timeoutMs);
+  return promise;
+}
+
+// 通知等待者
+private notifyResultWaiters(taskId: string, result: TaskResult): void {
+  const waiters = this.resultWaiters.get(taskId);
+  if (waiters) {
+    for (const { resolve } of waiters) {
+      resolve(result);
+    }
+    this.resultWaiters.delete(taskId);
+  }
+}
 ```
 
 ### 3. 进化周期流程

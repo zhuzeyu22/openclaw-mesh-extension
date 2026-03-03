@@ -6,6 +6,7 @@
  */
 
 import type { MeshConfig, AgentDNA, AgentType, FitnessScore, EvolutionStrategy, EvolutionPlan } from './types.js';
+import { generateId, countOccurrences } from './utils.js';
 
 interface SystemState {
   timestamp: number;
@@ -136,7 +137,7 @@ export class EvolutionPlanner {
     strategies.sort((a, b) => b.priority - a.priority);
 
     const plan: EvolutionPlan = {
-      id: this.generateId(),
+      id: generateId('plan'),
       createdAt: Date.now(),
       triggers: bottlenecks.map(b => b.type),
       bottlenecks,
@@ -253,15 +254,15 @@ export class EvolutionPlanner {
 
     // 基于历史瓶颈类型
     const bottleneckTypes = this.history.flatMap(h => h.plan.bottlenecks.map((b: {type: string}) => b.type));
-    const typeCounts = this.countOccurrences(bottleneckTypes);
+    const typeCounts = countOccurrences(bottleneckTypes);
 
-    if (typeCounts['capability'] > typeCounts['capacity']) {
+    if ((typeCounts.get('capability') || 0) > (typeCounts.get('capacity') || 0)) {
       // 能力瓶颈多于容量瓶颈，增加研究者
       recommendations.researcher += 1;
       reasons.push('历史数据显示频繁出现能力瓶颈，增加研究者');
     }
 
-    if (typeCounts['efficiency'] > 3) {
+    if ((typeCounts.get('efficiency') || 0) > 3) {
       // 效率问题多，增加验证者
       recommendations.validator = (recommendations.validator || 0) + 1;
       reasons.push('历史数据显示效率问题频发，增加验证者');
@@ -410,7 +411,7 @@ export class EvolutionPlanner {
 
           // 同时考虑变异现有智能体
           const lowPerformers = agentDNAs.filter(dna => {
-            const fitness = (dna as any).fitness as FitnessScore | undefined;
+            const fitness = dna.fitness;
             return fitness && fitness.overall < 0.6;
           });
 
@@ -595,22 +596,26 @@ export class EvolutionPlanner {
     details: string;
     underrepresented: AgentType[];
   } {
-    const counts: Record<string, number> = {};
+    const counts = new Map<string, number>();
     for (const dna of agentDNAs) {
       // 从ID推断类型（简化）
       const type = dna.id.split('-')[0] as AgentType;
-      counts[type] = (counts[type] || 0) + 1;
+      counts.set(type, (counts.get(type) || 0) + 1);
     }
 
-    const values = Object.values(counts);
+    const values = Array.from(counts.values());
+    if (values.length === 0) {
+      return { imbalance: 0, details: '无智能体', underrepresented: [] };
+    }
+
     const avg = values.reduce((a, b) => a + b, 0) / values.length;
     const max = Math.max(...values);
     const min = Math.min(...values);
 
-    const imbalance = (max - min) / avg;
+    const imbalance = avg > 0 ? (max - min) / avg : 0;
 
     const underrepresented: AgentType[] = [];
-    for (const [type, count] of Object.entries(counts)) {
+    for (const [type, count] of counts) {
       if (count < avg * 0.5) {
         underrepresented.push(type as AgentType);
       }
@@ -618,7 +623,7 @@ export class EvolutionPlanner {
 
     return {
       imbalance,
-      details: Object.entries(counts).map(([t, c]) => `${t}:${c}`).join(', '),
+      details: Array.from(counts.entries()).map(([t, c]) => `${t}:${c}`).join(', '),
       underrepresented,
     };
   }
@@ -668,18 +673,6 @@ export class EvolutionPlanner {
     return last.agentsByType;
   }
 
-  private countOccurrences<T>(arr: T[]): Record<string, number> {
-    const counts: Record<string, number> = {};
-    for (const item of arr) {
-      const key = String(item);
-      counts[key] = (counts[key] || 0) + 1;
-    }
-    return counts;
-  }
-
-  private generateId(): string {
-    return `plan-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-  }
 
   // 公开方法供外部使用
   getCurrentPlan(): EvolutionPlan | null {

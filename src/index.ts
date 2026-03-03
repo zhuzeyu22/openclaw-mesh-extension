@@ -11,6 +11,7 @@ export { SelfEvolvingMesh } from './mesh.js';
 export { EvolutionPlanner, type HistoricalEvolution } from './evolution-planner.js';
 export { TechAwareness } from './tech-awareness.js';
 export { ProactiveExplorer } from './proactive-explorer.js';
+export { generateId, sleep, createResolvablePromise, countOccurrences, limitArraySize } from './utils.js';
 export type { MeshConfig, MeshStatus, AgentType, EvolutionPlan, EvolutionStrategy } from './types.js';
 export type { TechTrend, CapabilityGap } from './tech-awareness.js';
 export type { ExplorationOpportunity, Experiment } from './proactive-explorer.js';

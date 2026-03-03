@@ -4,6 +4,7 @@
  */
 
 import type { AgentType, AgentDNA } from './types.js';
+import { generateId } from './utils.js';
 
 interface TechTrend {
   id: string;
@@ -133,7 +134,7 @@ export class TechAwareness {
 
     for (const item of selected) {
       trends.push({
-        id: `trend-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        id: generateId('trend'),
         category: item.category,
         title: item.title,
         summary: item.summary,

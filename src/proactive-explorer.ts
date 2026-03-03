@@ -5,6 +5,7 @@
 
 import type { AgentType, AgentDNA, EvolutionStrategy } from './types.js';
 import type { TechAwareness, TechTrend } from './tech-awareness.js';
+import { generateId, sleep, limitArraySize } from './utils.js';
 
 interface ExplorationOpportunity {
   id: string;
@@ -45,6 +46,8 @@ export class ProactiveExplorer {
   private explorationInterval?: NodeJS.Timeout;
   private readonly explorationCooldown = 30 * 60 * 1000; // 30分钟冷却
   private lastExploration = 0;
+  private readonly maxOpportunities = 50; // 最大机会数
+  private readonly maxExperiments = 100; // 最大实验数
 
   constructor(techAwareness: TechAwareness) {
     this.techAwareness = techAwareness;
@@ -107,7 +110,18 @@ export class ProactiveExplorer {
 
     console.log(`[ProactiveExplorer] Found ${evaluated.length} opportunities`);
 
+    // 清理旧数据，防止内存泄漏
+    this.cleanupOldData();
+
     return evaluated;
+  }
+
+  /**
+   * 清理旧数据，防止内存泄漏
+   */
+  private cleanupOldData(): void {
+    this.opportunities = limitArraySize(this.opportunities, this.maxOpportunities);
+    this.experiments = limitArraySize(this.experiments, this.maxExperiments);
   }
 
   /**
@@ -121,7 +135,7 @@ export class ProactiveExplorer {
       // 为高影响趋势创建专项进化机会
       if (trend.impact === 'critical') {
         opportunities.push({
-          id: `opp-tech-${trend.id}`,
+          id: generateId('opp-tech'),
           type: 'innovation',
           description: `集成"${trend.title}"技术能力，提升系统竞争力`,
           potential: trend.relevance * 0.9,
@@ -139,7 +153,7 @@ export class ProactiveExplorer {
       // 为中等影响趋势创建优化机会
       if (trend.impact === 'high' && trend.category === 'ai') {
         opportunities.push({
-          id: `opp-ai-${trend.id}`,
+          id: generateId('opp-ai'),
           type: 'optimization',
           description: `优化AI模型使用策略，应用${trend.title}最佳实践`,
           potential: trend.relevance * 0.7,
@@ -189,7 +203,7 @@ export class ProactiveExplorer {
     for (const gap of gaps) {
       if (gap.target - gap.current > 0.2) {
         opportunities.push({
-          id: `opp-gap-${gap.capability}`,
+          id: generateId('opp-gap'),
           type: 'specialization',
           description: `专项提升"${gap.capability}"能力，从${(gap.current * 100).toFixed(0)}%提升到${(gap.target * 100).toFixed(0)}%`,
           potential: (gap.target - gap.current) * 0.8,
@@ -238,7 +252,7 @@ export class ProactiveExplorer {
 
     for (const idea of selected) {
       opportunities.push({
-        id: `opp-curious-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+        id: generateId('opp-curious'),
         type: idea.type,
         description: idea.desc,
         potential: idea.potential,
@@ -276,7 +290,7 @@ export class ProactiveExplorer {
   private async runValidationExperiments(opportunities: ExplorationOpportunity[]): Promise<void> {
     for (const opp of opportunities) {
       const experiment: Experiment = {
-        id: `exp-${opp.id}`,
+        id: generateId('exp'),
         hypothesis: opp.description,
         method: `小规模试运行${opp.type}策略`,
         duration: 5 * 60 * 1000, // 5分钟
@@ -299,7 +313,7 @@ export class ProactiveExplorer {
    */
   private async simulateExperiment(experiment: Experiment, opportunity: ExplorationOpportunity): Promise<void> {
     // 模拟实验延迟
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await sleep(100);
 
     // 根据机会潜力决定成功率
     const successChance = opportunity.potential * 0.7 + 0.2;

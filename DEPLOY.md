@@ -28,12 +28,15 @@ cd openclaw-mesh-extension
 # 安装依赖
 npm install
 
+# 类型检查（确保无类型错误）
+npm run typecheck
+
 # 编译 TypeScript
 npm run build
 
 # 验证构建成功（应该生成 dist/ 目录）
 ls dist/
-# 应该看到: index.js, plugin.js, mesh.js, evolution-planner.js, types.js 等
+# 应该看到: index.js, plugin.js, mesh.js, evolution-planner.js, types.js, utils.js 等
 ```
 
 #### 步骤 2：复制到 OpenClaw
@@ -384,11 +387,14 @@ openclaw gateway restart
 │   └── openclaw-mesh/
 │       ├── package.json
 │       └── dist/
-│           ├── index.js
-│           ├── plugin.js
-│           ├── mesh.js
+│           ├── index.js           # 入口文件
+│           ├── plugin.js          # 插件实现
+│           ├── mesh.js            # 网格核心
 │           ├── evolution-planner.js
+│           ├── tech-awareness.js
+│           ├── proactive-explorer.js
 │           ├── types.js
+│           ├── utils.js           # 共享工具函数
 │           └── *.d.ts
 ├── logs/
 │   └── gateway.log               # 查看 Mesh 日志

@@ -118,24 +118,54 @@ seam:
     explorationIntervalMinutes: 20
 ```
 
+**⚠️ 配置格式说明：**
+
+OpenClaw 可能使用 YAML 或 JSON 格式的配置：
+- YAML: `~/.openclaw/config.yaml`
+- JSON: `~/.openclaw/openclaw.json`
+
+**如果是 JSON 格式（`openclaw.json`）：**
+
+```json
+{
+  "extensions": [
+    {
+      "path": "./extensions/openclaw-mesh-extension",
+      "enabled": true
+    }
+  ],
+  "seam": {
+    "autoStart": true,
+    "interceptMessages": false,
+    "genesisAgents": [
+      { "type": "orchestrator", "count": 1 },
+      { "type": "researcher", "count": 2 },
+      { "type": "executor", "count": 3 },
+      { "type": "validator", "count": 1 },
+      { "type": "evolver", "count": 1 }
+    ],
+    "evolution": {
+      "enabled": true,
+      "intervalMinutes": 360,
+      "selectionPressure": 0.3,
+      "mutationRate": 0.2
+    }
+  }
+}
+```
+
 **配置注意事项：**
-1. **`path` 是相对路径**：相对于 `config.yaml` 所在目录（通常是 `~/.openclaw/`）
-2. `seam:` 必须与 `extensions:` 同级（顶格写，不要缩进）
-3. `seam:` 下的所有配置项需要缩进 2 个空格
-4. 如果 `seam` 键不工作，可以尝试使用 `mesh:` 键（向下兼容）
+1. **`path` 是相对路径**：相对于配置文件所在目录（`~/.openclaw/`）
+2. JSON 格式需要确保括号匹配正确
+3. 如果 `seam` 键不工作，可以尝试使用 `mesh` 键
 
 **路径问题排查：**
 ```bash
-# 确认 config.yaml 位置
-openclaw config path  # 例如: /root/.openclaw/config.yaml
+# 确认配置文件位置
+ls ~/.openclaw/config.yaml 2>/dev/null || ls ~/.openclaw/openclaw.json
 
 # 确认扩展目录存在
 ls -la ~/.openclaw/extensions/openclaw-mesh-extension/dist/
-
-# 如果扩展目录在 /opt/openclaw/extensions/，则配置应为：
-# path: ./extensions/openclaw-mesh-extension
-# 或使用绝对路径（不推荐）：
-# path: /opt/openclaw/extensions/openclaw-mesh-extension
 ```
 
 #### 步骤 4：重启 OpenClaw Gateway

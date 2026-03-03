@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm *)",
+      "Bash(n*)",
+      "Bash(g*)",
+      "Bash(gi*)",
+      "Bash(git commit:*)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "Bash(ls:*)",
+      "Bash(chmod +x:*)",
+      "WebFetch(domain:microsoft.github.io)",
+      "WebFetch(domain:docs.crewai.com)"
+    ]
+  }
+}

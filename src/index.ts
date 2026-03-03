@@ -20,3 +20,14 @@ export { generateId, sleep, createResolvablePromise, countOccurrences, limitArra
 export type { MeshConfig, MeshStatus, AgentType, EvolutionPlan, EvolutionStrategy } from './types.js';
 export type { TechTrend, CapabilityGap } from './tech-awareness.js';
 export type { ExplorationOpportunity, Experiment } from './proactive-explorer.js';
+
+// 真实执行引擎导出
+export { TaskExecutor } from './executor.js';
+export type { ExecutorConfig, ExecutionResult } from './executor.js';
+
+// HTTP 服务器导出
+export { SeamServer } from './server.js';
+export type { ServerConfig } from './server.js';
+
+// 独立运行模式
+export { SeamApplication, loadConfigFromEnv } from './standalone.js';

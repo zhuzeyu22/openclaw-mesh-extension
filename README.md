@@ -12,9 +12,52 @@
 - 🎯 **自适应**：每 30 秒自动检查系统状态，必要时触发智能进化
 - 🔮 **预测能力**：基于历史趋势预测未来需求，提前规划资源配置
 
-## 🚀 快速安装
+## 🚀 快速开始
 
-### 一键安装（推荐）
+### 方式一：独立运行（推荐，真实 AI 执行）
+
+SEAM 现在可以作为独立服务运行，直接调用 OpenAI/Anthropic/本地模型 API 执行真实任务：
+
+```bash
+# 1. 克隆并构建
+git clone https://github.com/zhuzeyu22/openclaw-mesh-extension.git
+cd openclaw-mesh-extension
+npm install
+npm run build
+
+# 2. 配置 AI 提供商（以 OpenAI 为例）
+export SEAM_AI_PROVIDER=openai
+export OPENAI_API_KEY=sk-your-api-key
+export SEAM_AI_MODEL=gpt-4
+
+# 3. 启动服务
+npm start
+
+# 或使用启动脚本
+./start.sh
+```
+
+或使用配置文件：
+
+```bash
+# 复制示例配置
+cp seam-config.example.json seam-config.json
+# 编辑 seam-config.json 填入你的 API Key
+npm start
+```
+
+服务启动后：
+- HTTP API: http://localhost:18789
+- 查看状态: `curl http://localhost:18789/health`
+- 提交任务: `curl -X POST http://localhost:18789/mesh/submit -d '{"description": "研究 Rust 异步编程"}'`
+
+详细使用说明参见 [USAGE.md](./USAGE.md)
+
+### 方式二：作为 OpenClaw 插件安装
+
+**注意**：需要 OpenClaw 2026.3.0+ 版本支持插件系统。
+
+#### 一键安装（推荐）
 
 ```bash
 # 1. 克隆项目
@@ -72,9 +115,37 @@ chmod +x deploy.sh
 tail -f /tmp/openclaw-gateway.log | grep -i mesh
 ```
 
-详细部署文档参见 [DEPLOY.md](./DEPLOY.md)
+详细部署文档参见 [DEPLOY.md](./DEPLOY.md) 和 [USAGE.md](./USAGE.md)
 
-## 配置
+### 独立运行 vs OpenClaw 插件
+
+| 特性 | 独立运行 | OpenClaw 插件 |
+|------|----------|---------------|
+| **版本要求** | 所有版本 | OpenClaw 2026.3.0+ |
+| **真实 AI 执行** | ✅ 支持 | ⚠️ 依赖 OpenClaw 配置 |
+| **HTTP API** | ✅ 内置 | 需单独配置 |
+| **部署复杂度** | 低 | 中 |
+| **与 OpenClaw 集成** | 通过 HTTP | 原生集成 |
+
+### 环境变量配置
+
+```bash
+# AI 提供商（必须）
+export SEAM_AI_PROVIDER=openai  # 或 anthropic / local
+export OPENAI_API_KEY=sk-your-key
+export SEAM_AI_MODEL=gpt-4
+
+# 创世智能体配置
+export SEAM_AGENTS=O:1,R:2,E:3,V:1
+
+# 服务器配置
+export SEAM_PORT=18789
+export SEAM_HOST=0.0.0.0
+```
+
+更多配置选项参见 [.env.example](./.env.example)
+
+## OpenClaw 插件配置
 
 编辑 `~/.openclaw/config.yaml`：
 

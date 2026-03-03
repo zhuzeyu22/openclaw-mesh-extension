@@ -16,6 +16,7 @@ import type {
 import { EvolutionPlanner, type HistoricalEvolution } from './evolution-planner.js';
 import { TechAwareness } from './tech-awareness.js';
 import { ProactiveExplorer, type ExplorationOpportunity } from './proactive-explorer.js';
+import { TaskExecutor, type ExecutorConfig } from './executor.js';
 import { generateId, sleep, createResolvablePromise } from './utils.js';
 
 interface Agent {
@@ -48,6 +49,7 @@ export class SelfEvolvingMesh {
   private proactiveEvolutionTimer?: NodeJS.Timeout;
   private techScanTimer?: NodeJS.Timeout;
   private currentPlan: EvolutionPlan | null = null;
+  private executor?: TaskExecutor;
 
   constructor(config: MeshConfig) {
     this.config = config;
@@ -470,6 +472,14 @@ export class SelfEvolvingMesh {
     setImmediate(() => this.processQueue());
   }
 
+  /**
+   * 配置任务执行器
+   */
+  setExecutor(config: ExecutorConfig): void {
+    this.executor = new TaskExecutor(config);
+    console.log(`[SEAM] Task executor configured: ${config.provider}`);
+  }
+
   private async executeTask(task: Task, agent: Agent): Promise<void> {
     agent.isBusy = true;
     agent.taskCount++;
@@ -477,8 +487,8 @@ export class SelfEvolvingMesh {
     const startTime = Date.now();
 
     try {
-      // 模拟任务执行
-      const output = await this.simulateExecution(task, agent);
+      // 真实任务执行
+      const output = await this.executeWithAgent(task, agent);
 
       const result: TaskResult = {
         taskId: task.id,
@@ -507,21 +517,26 @@ export class SelfEvolvingMesh {
     }
   }
 
-  private async simulateExecution(task: Task, agent: Agent): Promise<string> {
-    // 模拟执行延迟
-    const delay = task.complexity === 'simple' ? 500 : task.complexity === 'medium' ? 1500 : 3000;
-    await sleep(delay);
+  /**
+   * 使用真实执行器执行任务
+   * 注意：必须配置执行器，否则抛出错误
+   */
+  private async executeWithAgent(task: Task, agent: Agent): Promise<string> {
+    if (!this.executor) {
+      throw new Error(
+        'No AI executor configured. ' +
+        'Please call mesh.setExecutor(config) before starting the mesh. ' +
+        'Supported providers: openai, anthropic, local'
+      );
+    }
 
-    // 生成模拟结果
-    const behaviors: Record<AgentType, string> = {
-      orchestrator: `协调并分解任务: "${task.description}"`,
-      researcher: `研究 "${task.description}" 的结果:\n- 发现1: ...\n- 发现2: ...`,
-      executor: `执行 "${task.description}" 的结果:\n[执行完成]`,
-      validator: `验证 "${task.description}" 的结果:\n✓ 通过所有检查`,
-      evolver: `进化分析: "${task.description}"`,
-    };
+    const result = await this.executor.execute(task, agent.type);
 
-    return behaviors[agent.type] || `处理完成: ${task.description}`;
+    if (!result.success) {
+      throw new Error(`Task execution failed: ${result.output}`);
+    }
+
+    return result.output;
   }
 
   private selectAgentType(task: Task): AgentType {

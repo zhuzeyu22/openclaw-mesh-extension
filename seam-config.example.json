@@ -1,0 +1,31 @@
+{
+  "_comment": "SEAM 配置文件示例 - 复制为 seam-config.json 并修改",
+  "mesh": {
+    "genesisAgents": [
+      { "type": "orchestrator", "count": 1 },
+      { "type": "researcher", "count": 2 },
+      { "type": "executor", "count": 3 },
+      { "type": "validator", "count": 1 },
+      { "type": "evolver", "count": 1 }
+    ],
+    "evolution": {
+      "enabled": true,
+      "intervalMinutes": 360,
+      "selectionPressure": 0.7,
+      "mutationRate": 0.1
+    },
+    "autoStart": true,
+    "interceptMessages": false
+  },
+  "executor": {
+    "provider": "openai",
+    "apiKey": "your-openai-api-key-here",
+    "model": "gpt-4",
+    "timeoutMs": 60000
+  },
+  "server": {
+    "port": 18789,
+    "host": "0.0.0.0",
+    "apiKey": "optional-api-key-for-http-auth"
+  }
+}

@@ -119,9 +119,24 @@ seam:
 ```
 
 **配置注意事项：**
-1. `seam:` 必须与 `extensions:` 同级（顶格写，不要缩进）
-2. `seam:` 下的所有配置项需要缩进 2 个空格
-3. 如果 `seam` 键不工作，可以尝试使用 `mesh:` 键（向下兼容）
+1. **`path` 是相对路径**：相对于 `config.yaml` 所在目录（通常是 `~/.openclaw/`）
+2. `seam:` 必须与 `extensions:` 同级（顶格写，不要缩进）
+3. `seam:` 下的所有配置项需要缩进 2 个空格
+4. 如果 `seam` 键不工作，可以尝试使用 `mesh:` 键（向下兼容）
+
+**路径问题排查：**
+```bash
+# 确认 config.yaml 位置
+openclaw config path  # 例如: /root/.openclaw/config.yaml
+
+# 确认扩展目录存在
+ls -la ~/.openclaw/extensions/openclaw-mesh-extension/dist/
+
+# 如果扩展目录在 /opt/openclaw/extensions/，则配置应为：
+# path: ./extensions/openclaw-mesh-extension
+# 或使用绝对路径（不推荐）：
+# path: /opt/openclaw/extensions/openclaw-mesh-extension
+```
 
 #### 步骤 4：重启 OpenClaw Gateway
 
